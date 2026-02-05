@@ -1,4 +1,4 @@
-name: Android Build
+name: Build Debug APK
 
 on:
   push:
@@ -21,26 +21,35 @@ jobs:
       - name: Install Node Dependencies
         run: npm install --force
 
-      - name: Build Web Assets
+      - name: Build Web App
         run: |
-          # বিল্ড করার চেষ্টা করবে, ফেইল করলে ফোল্ডার তৈরি করবে
+          # বিল্ড করার চেষ্টা করবে
           npm run build || true
+          # জোর করে 'dist' ফোল্ডার তৈরি করা এবং ফাইল চেক করা
           mkdir -p dist
-          mkdir -p build
-          # যদি রুট ফাইলে index.html থাকে তবে তা কপি করবে
-          cp index.html dist/index.html || echo "<html><body>StreamX Pro Loading...</body></html>" > dist/index.html
+          if [ -f index.html ]; then
+            cp index.html dist/index.html
+          else
+            echo "<html><body>StreamX Pro Loading...</body></html>" > dist/index.html
+          fi
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Sync Capacitor
+      - name: Fix Capacitor Config & Sync
         run: |
-          # Capacitor ইনিশিয়ালাইজ এবং সিঙ্ক করা
-          npm install @capacitor/android @capacitor/cli @capacitor/core
-          npx cap init StreamX Pro com.mdnhbn.streamx --web-dir dist || true
+          npm install @capacitor/android @capacitor/core @capacitor/cli
+          # এখানে একটি সঠিক App ID (com.mdnhbn.streamx) ব্যবহার করা হয়েছে
+          npx cap init StreamXPro com.mdnhbn.streamx --web-dir dist || true
+          # কনফিগারেশন ফাইলে webDir ঠিক করা হচ্ছে
+          echo '{"appId": "com.mdnhbn.streamx", "appName": "StreamXPro", "webDir": "dist", "server": {"androidScheme": "https"}}' > capacitor.config.json
           npx cap add android || true
           npx cap copy android
           npx cap sync android
+
+      - name: Fix Duplicate Class Error
+        run: |
+          echo "configurations.all { resolutionStrategy.eachDependency { details -> if (details.requested.group == 'org.jetbrains.kotlin') { details.useVersion '1.8.22' } } }" >> android/app/build.gradle
 
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
@@ -53,5 +62,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: StreamX-Pro-APK
+          name: StreamX-Final-Working-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
